@@ -1,0 +1,255 @@
+{% extends "base.html" %}
+
+{% block title %}Manager Dashboard{% endblock %}
+
+{% block content %}
+<div style="display: flex; gap: 12px; margin-bottom: 20px;">
+    <button class="btn btn-primary" onclick="location.href='{{ url_for('manager_pos') }}'">🛒 Open POS</button>
+    <button class="btn btn-primary" onclick="showInventoryReport()">📦 View Inventory Report</button>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 30px;">
+    <!-- Stats Cards -->
+    <div class="card">
+        <div class="card-body">
+            <div style="color: #64748b; font-size: 13px; margin-bottom: 8px;">Today's Sales</div>
+            <div style="font-size: 32px; font-weight: 700; color: #4f46e5;">{{ stats.today_sales }}</div>
+            <div style="color: #10b981; font-size: 14px; margin-top: 4px;">${{ "%.2f"|format(stats.today_revenue) }}</div>
+            <div style="display: flex; gap: 10px; margin-top: 8px; font-size: 12px;">
+                <div style="color: #16a34a;">💵 Cash: ${{ "%.2f"|format(stats.today_cash) }}</div>
+                <div style="color: #2563eb;">📱 EcoCash: ${{ "%.2f"|format(stats.today_ecocash) }}</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <div style="color: #64748b; font-size: 13px; margin-bottom: 8px;">This Week</div>
+            <div style="font-size: 32px; font-weight: 700; color: #14b8a6;">{{ stats.week_sales }}</div>
+            <div style="color: #10b981; font-size: 14px; margin-top: 4px;">${{ "%.2f"|format(stats.week_revenue) }}</div>
+            <div style="display: flex; gap: 10px; margin-top: 8px; font-size: 12px;">
+                <div style="color: #16a34a;">💵 Cash: ${{ "%.2f"|format(stats.week_cash) }}</div>
+                <div style="color: #2563eb;">📱 EcoCash: ${{ "%.2f"|format(stats.week_ecocash) }}</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <div style="color: #64748b; font-size: 13px; margin-bottom: 8px;">Low Stock Items</div>
+            <div style="font-size: 32px; font-weight: 700; color: #ef4444;">{{ stats.low_stock_count }}</div>
+            <div style="color: #64748b; font-size: 14px; margin-top: 4px;">Requires attention</div>
+        </div>
+    </div>
+</div>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+    <!-- Low Stock Items -->
+    <div class="card">
+        <div class="card-header">
+            <span class="card-icon">⚠️</span>
+            <h2 class="card-title">Low Stock Alerts</h2>
+        </div>
+        <div class="card-body" style="padding: 0;">
+            <table class="cart-table">
+                <thead>
+                    <tr>
+                        <th>Product</th>
+                        <th>Stock</th>
+                        <th>Threshold</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in stats.low_stock_items %}
+                    <tr>
+                        <td>{{ item[0] }}</td>
+                        <td style="color: #ef4444; font-weight: 600;">{{ item[1] }}</td>
+                        <td>{{ item[2] }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Recent Sales -->
+    <div class="card">
+        <div class="card-header">
+            <span class="card-icon">📈</span>
+            <h2 class="card-title">Recent Sales</h2>
+        </div>
+        <div class="card-body" style="padding: 0;">
+            <table class="cart-table">
+                <thead>
+                    <tr>
+                        <th>Sale ID</th>
+                        <th>Amount</th>
+                        <th>Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for sale in stats.recent_sales %}
+                    <tr>
+                        <td>#{{ sale[0] }}</td>
+                        <td style="color: #10b981; font-weight: 600;">${{ "%.2f"|format(sale[1]) }}</td>
+                        <td style="font-size: 13px; color: #64748b;">{{ sale[2] }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Inventory Report Modal -->
+<div id="inventoryReportModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
+    <div style="background: white; border-radius: 12px; padding: 30px; width: 90%; max-width: 1000px; max-height: 80vh; overflow-y: auto;">
+        <h3 style="margin-bottom: 20px;">Inventory Report</h3>
+        <div id="inventoryReportContent"></div>
+        <div style="display: flex; gap: 10px; margin-top: 20px;">
+            <button class="btn btn-success" onclick="printInventoryReport()">🖨️ Print</button>
+            <button class="btn btn-primary" onclick="closeInventoryReportModal()">Close</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+async function showInventoryReport() {
+    const response = await fetch('/api/inventory-report');
+    const data = await response.json();
+
+    if (data.success) {
+        const report = data.report;
+        let content = `
+            <div style="text-align: center; margin-bottom: 20px; padding: 20px; background: #f8fafc; border-radius: 8px;">
+                <h2 style="margin: 0 0 10px 0; color: #1e293b;">INVENTORY REPORT</h2>
+                <h3 style="margin: 0; color: #4f46e5;">LastKingz Liquor Store</h3>
+            </div>
+
+            <div style="background: #f8fafc; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                <h4 style="margin: 0 0 15px 0; color: #1e293b;">SUMMARY:</h4>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div><strong>Total Products:</strong> ${report.total_products}</div>
+                    <div><strong>Low Stock Items:</strong> ${report.low_stock_count}</div>
+                    <div><strong>Out of Stock:</strong> ${report.out_of_stock_count}</div>
+                    <div><strong>Total Inventory Value:</strong> $${report.total_inventory_value.toFixed(2)}</div>
+                </div>
+            </div>
+        `;
+
+        // All products in stock
+        if (report.all_products && report.all_products.length > 0) {
+            content += `
+                <div style="margin-bottom: 20px;">
+                    <h4 style="margin: 0 0 15px 0; color: #1e293b;">ALL PRODUCTS IN STOCK:</h4>
+                    <table class="cart-table">
+                        <thead>
+                            <tr>
+                                <th style="text-align: left;">Product</th>
+                                <th style="text-align: left;">Barcode</th>
+                                <th style="text-align: right;">Stock</th>
+                                <th style="text-align: right;">Price</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+
+            report.all_products.forEach(item => {
+                content += `
+                    <tr>
+                        <td>${item.name}</td>
+                        <td>${item.barcode}</td>
+                        <td style="text-align: right;">${item.stock}</td>
+                        <td style="text-align: right;">$${item.price.toFixed(2)}</td>
+                    </tr>
+                `;
+            });
+
+            content += `
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        }
+
+        // Low stock items
+        if (report.low_stock_items && report.low_stock_items.length > 0) {
+            content += `
+                <div style="margin-bottom: 20px;">
+                    <h4 style="margin: 0 0 15px 0; color: #ef4444;">⚠️ LOW STOCK ALERTS:</h4>
+                    <table class="cart-table">
+                        <thead>
+                            <tr>
+                                <th style="text-align: left;">Product</th>
+                                <th style="text-align: right;">Stock</th>
+                                <th style="text-align: right;">Threshold</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+
+            report.low_stock_items.forEach(item => {
+                content += `
+                    <tr>
+                        <td>${item.name}</td>
+                        <td style="text-align: right; color: #ef4444; font-weight: 600;">${item.stock}</td>
+                        <td style="text-align: right;">${item.low_stock_threshold}</td>
+                    </tr>
+                `;
+            });
+
+            content += `
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        }
+
+        content += `<div style="text-align: center; color: #64748b; font-size: 13px; margin-top: 20px;">Report generated: ${new Date().toLocaleString()}</div>`;
+
+        document.getElementById('inventoryReportContent').innerHTML = content;
+        document.getElementById('inventoryReportModal').style.display = 'flex';
+    } else {
+        alert('Error loading inventory report: ' + data.message);
+    }
+}
+
+function closeInventoryReportModal() {
+    document.getElementById('inventoryReportModal').style.display = 'none';
+}
+
+function printInventoryReport() {
+    const content = document.getElementById('inventoryReportContent').innerHTML;
+
+    // Create a new window for printing
+    const printWindow = window.open('', '', 'width=900,height=700');
+    printWindow.document.write('<html><head><title>Inventory Report - LastKingz Liquor Store</title>');
+    printWindow.document.write('<style>');
+    printWindow.document.write('body { font-family: Arial, sans-serif; font-size: 12px; margin: 20px; }');
+    printWindow.document.write('table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }');
+    printWindow.document.write('th, td { padding: 8px; border: 1px solid #e2e8f0; }');
+    printWindow.document.write('th { background: #f1f5f9; font-weight: 600; }');
+    printWindow.document.write('h2, h3, h4 { margin: 10px 0; }');
+    printWindow.document.write('@media print { button { display: none; } }');
+    printWindow.document.write('</style></head><body>');
+    printWindow.document.write(content);
+    printWindow.document.write('</body></html>');
+    printWindow.document.close();
+
+    // Wait for content to load then print
+    printWindow.focus();
+    setTimeout(() => {
+        printWindow.print();
+    }, 250);
+}
+
+// Close modal when clicking outside
+window.onclick = function(event) {
+    if (event.target == document.getElementById('inventoryReportModal')) {
+        closeInventoryReportModal();
+    }
+}
+</script>
+{% endblock %}

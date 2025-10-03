@@ -1,0 +1,289 @@
+{% extends "base.html" %}
+
+{% block title %}Product Management{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+            <span class="card-icon">📦</span>
+            <h2 class="card-title" style="display: inline;">Product Management</h2>
+        </div>
+        <button class="btn btn-success" onclick="showAddProductModal()" style="padding: 8px 16px; font-size: 13px;">+ Add Product</button>
+    </div>
+    <div class="card-body" style="padding: 0;">
+        <table class="cart-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Barcode</th>
+                    <th>Price</th>
+                    <th>Stock</th>
+                    <th>Low Stock Alert</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for product in products %}
+                <tr {% if product.stock <= product.low_stock_threshold %}style="background: #fee2e2;"{% endif %}>
+                    <td>{{ product.id }}</td>
+                    <td>{{ product.name }}</td>
+                    <td>{{ product.barcode }}</td>
+                    <td>${{ "%.2f"|format(product.price) }}</td>
+                    <td>{{ product.stock }}</td>
+                    <td>{{ product.low_stock_threshold }}</td>
+                    <td>
+                        <button class="btn btn-primary" style="font-size: 11px; padding: 4px 10px; margin: 2px;" onclick="showEditProductModal({{ product.id }})">Edit</button>
+                        <button class="btn btn-success" style="font-size: 11px; padding: 4px 10px; margin: 2px;" onclick="showAddStockModal({{ product.id }}, '{{ product.name }}')">+ Stock</button>
+                        <button class="btn btn-warning" style="font-size: 11px; padding: 4px 10px; margin: 2px;" onclick="showRemoveStockModal({{ product.id }}, '{{ product.name }}', {{ product.stock }})">- Stock</button>
+                        <button class="btn btn-danger" style="font-size: 11px; padding: 4px 10px; margin: 2px;" onclick="deleteProduct({{ product.id }}, '{{ product.name }}')">Delete</button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Add/Edit Product Modal -->
+<div id="productModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
+    <div style="background: white; border-radius: 12px; padding: 30px; width: 90%; max-width: 500px;">
+        <h3 id="modalTitle" style="margin-bottom: 20px;">Add Product</h3>
+        <form id="productForm">
+            <input type="hidden" id="productId">
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #64748b;">Barcode</label>
+                <input type="text" id="barcode" required style="width: 100%; padding: 10px; border: 1px solid #e2e8f0; border-radius: 6px;">
+            </div>
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #64748b;">Product Name</label>
+                <input type="text" id="productName" required style="width: 100%; padding: 10px; border: 1px solid #e2e8f0; border-radius: 6px;">
+            </div>
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #64748b;">Price ($)</label>
+                <input type="number" id="price" step="0.01" required style="width: 100%; padding: 10px; border: 1px solid #e2e8f0; border-radius: 6px;">
+            </div>
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #64748b;">Stock Quantity</label>
+                <input type="number" id="stock" required style="width: 100%; padding: 10px; border: 1px solid #e2e8f0; border-radius: 6px;">
+            </div>
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #64748b;">Low Stock Alert</label>
+                <input type="number" id="lowStockThreshold" required value="10" style="width: 100%; padding: 10px; border: 1px solid #e2e8f0; border-radius: 6px;">
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button type="submit" class="btn btn-success" style="flex: 1;">Save</button>
+                <button type="button" class="btn" style="flex: 1; background: #94a3b8;" onclick="closeProductModal()">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Add Stock Modal -->
+<div id="addStockModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
+    <div style="background: white; border-radius: 12px; padding: 30px; width: 90%; max-width: 400px;">
+        <h3 style="margin-bottom: 20px;">Add Stock</h3>
+        <p id="addStockProductName" style="margin-bottom: 15px; color: #64748b;"></p>
+        <form id="addStockForm">
+            <input type="hidden" id="addStockProductId">
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #64748b;">Quantity to Add</label>
+                <input type="number" id="addStockQuantity" required min="1" style="width: 100%; padding: 10px; border: 1px solid #e2e8f0; border-radius: 6px;">
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button type="submit" class="btn btn-success" style="flex: 1;">Add Stock</button>
+                <button type="button" class="btn" style="flex: 1; background: #94a3b8;" onclick="closeAddStockModal()">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Remove Stock Modal -->
+<div id="removeStockModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
+    <div style="background: white; border-radius: 12px; padding: 30px; width: 90%; max-width: 400px;">
+        <h3 style="margin-bottom: 20px;">Remove Stock</h3>
+        <p id="removeStockProductName" style="margin-bottom: 15px; color: #64748b;"></p>
+        <form id="removeStockForm">
+            <input type="hidden" id="removeStockProductId">
+            <input type="hidden" id="currentStock">
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #64748b;">Quantity to Remove</label>
+                <input type="number" id="removeStockQuantity" required min="1" style="width: 100%; padding: 10px; border: 1px solid #e2e8f0; border-radius: 6px;">
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button type="submit" class="btn btn-warning" style="flex: 1;">Remove Stock</button>
+                <button type="button" class="btn" style="flex: 1; background: #94a3b8;" onclick="closeRemoveStockModal()">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Add Product Modal
+function showAddProductModal() {
+    document.getElementById('modalTitle').textContent = 'Add Product';
+    document.getElementById('productForm').reset();
+    document.getElementById('productId').value = '';
+    document.getElementById('barcode').disabled = false;
+    document.getElementById('productModal').style.display = 'flex';
+}
+
+function showEditProductModal(productId) {
+    fetch(`/api/product-by-id/${productId}`)
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                const p = data.product;
+                document.getElementById('modalTitle').textContent = 'Edit Product';
+                document.getElementById('productId').value = p.id;
+                document.getElementById('barcode').value = p.barcode;
+                document.getElementById('barcode').disabled = true;
+                document.getElementById('productName').value = p.name;
+                document.getElementById('price').value = p.price;
+                document.getElementById('stock').value = p.stock;
+                document.getElementById('lowStockThreshold').value = p.low_stock_threshold;
+                document.getElementById('productModal').style.display = 'flex';
+            }
+        });
+}
+
+function closeProductModal() {
+    document.getElementById('productModal').style.display = 'none';
+}
+
+document.getElementById('productForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const productId = document.getElementById('productId').value;
+    const data = {
+        barcode: document.getElementById('barcode').value,
+        name: document.getElementById('productName').value,
+        price: parseFloat(document.getElementById('price').value),
+        stock: parseInt(document.getElementById('stock').value),
+        low_stock_threshold: parseInt(document.getElementById('lowStockThreshold').value)
+    };
+
+    const url = productId ? `/api/product/${productId}` : '/api/product';
+    const method = productId ? 'PUT' : 'POST';
+
+    const response = await fetch(url, {
+        method: method,
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    });
+
+    const result = await response.json();
+    if (result.success) {
+        alert(productId ? 'Product updated successfully' : 'Product added successfully');
+        location.reload();
+    } else {
+        alert('Error: ' + result.message);
+    }
+});
+
+// Add Stock Modal
+function showAddStockModal(productId, productName) {
+    document.getElementById('addStockProductId').value = productId;
+    document.getElementById('addStockProductName').textContent = `Product: ${productName}`;
+    document.getElementById('addStockQuantity').value = '';
+    document.getElementById('addStockModal').style.display = 'flex';
+}
+
+function closeAddStockModal() {
+    document.getElementById('addStockModal').style.display = 'none';
+}
+
+document.getElementById('addStockForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const productId = document.getElementById('addStockProductId').value;
+    const quantity = parseInt(document.getElementById('addStockQuantity').value);
+
+    const response = await fetch(`/api/product/${productId}/add-stock`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({quantity: quantity})
+    });
+
+    const result = await response.json();
+    if (result.success) {
+        alert('Stock added successfully');
+        location.reload();
+    } else {
+        alert('Error: ' + result.message);
+    }
+});
+
+// Remove Stock Modal
+function showRemoveStockModal(productId, productName, currentStock) {
+    document.getElementById('removeStockProductId').value = productId;
+    document.getElementById('currentStock').value = currentStock;
+    document.getElementById('removeStockProductName').textContent = `Product: ${productName} (Current Stock: ${currentStock})`;
+    document.getElementById('removeStockQuantity').value = '';
+    document.getElementById('removeStockModal').style.display = 'flex';
+}
+
+function closeRemoveStockModal() {
+    document.getElementById('removeStockModal').style.display = 'none';
+}
+
+document.getElementById('removeStockForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const productId = document.getElementById('removeStockProductId').value;
+    const quantity = parseInt(document.getElementById('removeStockQuantity').value);
+    const currentStock = parseInt(document.getElementById('currentStock').value);
+
+    if (quantity > currentStock) {
+        alert(`Cannot remove ${quantity} items. Only ${currentStock} in stock.`);
+        return;
+    }
+
+    const response = await fetch(`/api/product/${productId}/remove-stock`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({quantity: quantity})
+    });
+
+    const result = await response.json();
+    if (result.success) {
+        alert('Stock removed successfully');
+        location.reload();
+    } else {
+        alert('Error: ' + result.message);
+    }
+});
+
+// Delete Product
+async function deleteProduct(productId, productName) {
+    if (!confirm(`Are you sure you want to delete '${productName}'?`)) {
+        return;
+    }
+
+    const response = await fetch(`/api/product/${productId}`, {
+        method: 'DELETE'
+    });
+
+    const result = await response.json();
+    if (result.success) {
+        alert('Product deleted successfully');
+        location.reload();
+    } else {
+        alert('Error: ' + result.message);
+    }
+}
+
+// Close modal when clicking outside
+window.onclick = function(event) {
+    if (event.target == document.getElementById('productModal')) {
+        closeProductModal();
+    }
+    if (event.target == document.getElementById('addStockModal')) {
+        closeAddStockModal();
+    }
+    if (event.target == document.getElementById('removeStockModal')) {
+        closeRemoveStockModal();
+    }
+}
+</script>
+{% endblock %}

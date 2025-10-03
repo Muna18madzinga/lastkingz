@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+
+{% block title %}Sales Reports{% endblock %}
+
+{% block content %}
+<div class="card" style="margin-bottom: 20px;">
+    <div class="card-header">
+        <span class="card-icon">📈</span>
+        <h2 class="card-title">Sales Reports</h2>
+    </div>
+    <div class="card-body">
+        <div style="margin-bottom: 20px;">
+            <label style="font-weight: 600; color: #64748b; margin-bottom: 10px; display: block;">Report Period</label>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <button class="btn btn-primary" onclick="loadReport('today')">Today</button>
+                <button class="btn btn-primary" onclick="loadReport('yesterday')">Yesterday</button>
+                <button class="btn btn-primary" onclick="loadReport('week')">This Week</button>
+                <button class="btn btn-primary" onclick="loadReport('month')">This Month</button>
+                <button class="btn btn-primary" onclick="loadReport('all')">All Time</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card" style="margin-bottom: 20px;">
+    <div class="card-header">
+        <span class="card-icon">📊</span>
+        <h2 class="card-title">Summary</h2>
+    </div>
+    <div class="card-body">
+        <div id="summary" style="background: #f8fafc; padding: 20px; border-radius: 8px; font-family: monospace;">
+            <div style="font-size: 16px; font-weight: 700; margin-bottom: 15px; color: #1e293b;" id="reportTitle">Select a report period</div>
+            <div id="summaryStats"></div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <span class="card-icon">💰</span>
+        <h2 class="card-title">Sales Transactions</h2>
+    </div>
+    <div class="card-body" style="padding: 0;">
+        <table class="cart-table">
+            <thead>
+                <tr>
+                    <th>Sale ID</th>
+                    <th>Date/Time</th>
+                    <th>Total</th>
+                    <th>Cash</th>
+                    <th>Change</th>
+                    <th>Items</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="salesTable">
+                <tr>
+                    <td colspan="7" style="text-align: center; color: #64748b; padding: 40px;">Select a report period to view sales</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Sale Details Modal -->
+<div id="saleDetailsModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
+    <div style="background: white; border-radius: 12px; padding: 30px; width: 90%; max-width: 700px; max-height: 80vh; overflow-y: auto;">
+        <h3 id="detailsTitle" style="margin-bottom: 20px;">Sale Details</h3>
+        <div style="background: #f8fafc; padding: 20px; border-radius: 8px; font-family: monospace; font-size: 13px; white-space: pre-wrap;" id="detailsContent"></div>
+        <button class="btn btn-primary" style="margin-top: 20px;" onclick="closeSaleDetailsModal()">Close</button>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentReport = null;
+
+async function loadReport(period) {
+    const response = await fetch(`/api/sales-report/${period}`);
+    const data = await response.json();
+
+    if (data.success) {
+        currentReport = data;
+        displaySummary(data);
+        displaySales(data.sales);
+    } else {
+        alert('Error loading report: ' + data.message);
+    }
+}
+
+function displaySummary(data) {
+    const titles = {
+        'today': "Today's Sales",
+        'yesterday': "Yesterday's Sales",
+        'week': "This Week's Sales",
+        'month': "This Month's Sales",
+        'all': "All Time Sales"
+    };
+
+    document.getElementById('reportTitle').textContent = `═══ ${data.title || 'Sales Report'} ═══`;
+
+    const avgSale = data.summary.total_sales > 0 ? data.summary.total_revenue / data.summary.total_sales : 0;
+
+    const summaryHTML = `
+        <div style="line-height: 1.8;">
+            <strong>Total Sales:</strong>        ${data.summary.total_sales}<br>
+            <strong>Total Revenue:</strong>      $${data.summary.total_revenue.toFixed(2)}<br>
+            <strong>Average Sale:</strong>       $${avgSale.toFixed(2)}<br>
+            <strong>Cash Collected:</strong>     $${data.summary.total_cash.toFixed(2)}<br>
+            <strong>Change Given:</strong>       $${data.summary.total_change.toFixed(2)}
+        </div>
+    `;
+
+    document.getElementById('summaryStats').innerHTML = summaryHTML;
+}
+
+function displaySales(sales) {
+    const tbody = document.getElementById('salesTable');
+    tbody.innerHTML = '';
+
+    if (sales.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: #64748b; padding: 40px;">No sales found for this period</td></tr>';
+        return;
+    }
+
+    sales.forEach(sale => {
+        const row = tbody.insertRow();
+        row.innerHTML = `
+            <td>${sale.id}</td>
+            <td>${sale.sale_date}</td>
+            <td>$${sale.total_amount.toFixed(2)}</td>
+            <td>$${sale.cash_received.toFixed(2)}</td>
+            <td>$${sale.change_given.toFixed(2)}</td>
+            <td>${sale.item_count}</td>
+            <td><button class="btn btn-primary" style="font-size: 11px; padding: 4px 10px;" onclick="viewSaleDetails(${sale.id})">View Details</button></td>
+        `;
+    });
+}
+
+async function viewSaleDetails(saleId) {
+    const response = await fetch(`/api/sale-details/${saleId}`);
+    const data = await response.json();
+
+    if (data.success) {
+        document.getElementById('detailsTitle').textContent = `Sale #${saleId} - Details`;
+
+        let details = `${'Item'.padEnd(30)} ${'Qty'.padEnd(5)} ${'Price'.padEnd(10)} ${'Subtotal'.padEnd(10)}\n`;
+        details += '='.repeat(60) + '\n';
+
+        data.items.forEach(item => {
+            details += `${item.product_name.padEnd(30)} ${String(item.quantity).padEnd(5)} $${item.unit_price.toFixed(2).padEnd(9)} $${item.subtotal.toFixed(2).padEnd(9)}\n`;
+        });
+
+        document.getElementById('detailsContent').textContent = details;
+        document.getElementById('saleDetailsModal').style.display = 'flex';
+    } else {
+        alert('Error loading sale details: ' + data.message);
+    }
+}
+
+function closeSaleDetailsModal() {
+    document.getElementById('saleDetailsModal').style.display = 'none';
+}
+
+// Close modal when clicking outside
+window.onclick = function(event) {
+    if (event.target == document.getElementById('saleDetailsModal')) {
+        closeSaleDetailsModal();
+    }
+}
+
+// Load today's report by default
+window.addEventListener('load', function() {
+    loadReport('today');
+});
+</script>
+{% endblock %}

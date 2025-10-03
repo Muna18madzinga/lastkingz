@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+
+{% block title %}Cashier Dashboard{% endblock %}
+
+{% block content %}
+<div style="display: flex; gap: 12px; margin-bottom: 20px;">
+    <button class="btn btn-primary" onclick="location.href='{{ url_for('cashier_pos') }}'">🛒 Open POS</button>
+    <button class="btn btn-primary" onclick="showDailySalesReport()">📊 View Daily Sales Report</button>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 30px;">
+    <!-- Stats Cards -->
+    <div class="card">
+        <div class="card-body">
+            <div style="color: #64748b; font-size: 13px; margin-bottom: 8px;">Today's Sales</div>
+            <div style="font-size: 32px; font-weight: 700; color: #4f46e5;">{{ stats.today_sales }}</div>
+            <div style="color: #10b981; font-size: 14px; margin-top: 4px;">${{ "%.2f"|format(stats.today_revenue) }}</div>
+            <div style="display: flex; gap: 10px; margin-top: 8px; font-size: 12px;">
+                <div style="color: #16a34a;">💵 Cash: ${{ "%.2f"|format(stats.cash_total) }}</div>
+                <div style="color: #2563eb;">📱 EcoCash: ${{ "%.2f"|format(stats.ecocash_total) }}</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <div style="color: #64748b; font-size: 13px; margin-bottom: 8px;">Average Sale</div>
+            <div style="font-size: 32px; font-weight: 700; color: #14b8a6;">${{ "%.2f"|format(stats.avg_sale) }}</div>
+            <div style="color: #64748b; font-size: 14px; margin-top: 4px;">Per transaction</div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <div style="color: #64748b; font-size: 13px; margin-bottom: 8px;">My Sales Today</div>
+            <div style="font-size: 32px; font-weight: 700; color: #8b5cf6;">{{ stats.my_sales }}</div>
+            <div style="color: #10b981; font-size: 14px; margin-top: 4px;">${{ "%.2f"|format(stats.my_revenue) }}</div>
+            <div style="display: flex; gap: 10px; margin-top: 8px; font-size: 12px;">
+                <div style="color: #16a34a;">💵 Cash: ${{ "%.2f"|format(stats.my_cash_total) }}</div>
+                <div style="color: #2563eb;">📱 EcoCash: ${{ "%.2f"|format(stats.my_ecocash_total) }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div style="display: grid; grid-template-columns: 1fr; gap: 20px;">
+    <!-- Recent Sales -->
+    <div class="card">
+        <div class="card-header">
+            <span class="card-icon">📈</span>
+            <h2 class="card-title">My Recent Sales</h2>
+        </div>
+        <div class="card-body" style="padding: 0;">
+            <table class="cart-table">
+                <thead>
+                    <tr>
+                        <th>Sale ID</th>
+                        <th>Items</th>
+                        <th>Amount</th>
+                        <th>Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if stats.recent_sales %}
+                        {% for sale in stats.recent_sales %}
+                        <tr>
+                            <td>#{{ sale[0] }}</td>
+                            <td>{{ sale[3] }} items</td>
+                            <td style="color: #10b981; font-weight: 600;">${{ "%.2f"|format(sale[1]) }}</td>
+                            <td style="font-size: 13px; color: #64748b;">{{ sale[2] }}</td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="4" style="text-align: center; color: #64748b; padding: 20px;">No sales yet today</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Daily Sales Report Modal -->
+<div id="dailySalesReportModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
+    <div style="background: white; border-radius: 12px; padding: 30px; width: 90%; max-width: 900px; max-height: 80vh; overflow-y: auto;">
+        <h3 style="margin-bottom: 20px;">Daily Sales Report</h3>
+        <div id="dailySalesReportContent"></div>
+        <div style="display: flex; gap: 10px; margin-top: 20px;">
+            <button class="btn btn-success" onclick="printDailySalesReport()">🖨️ Print</button>
+            <button class="btn btn-primary" onclick="closeDailySalesReportModal()">Close</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+async function showDailySalesReport() {
+    const response = await fetch('/api/cashier-daily-sales');
+    const data = await response.json();
+
+    if (data.success) {
+        const report = data.report;
+        let content = `
+            <div style="text-align: center; margin-bottom: 20px; padding: 20px; background: #f8fafc; border-radius: 8px;">
+                <h2 style="margin: 0 0 10px 0; color: #1e293b;">DAILY SALES REPORT</h2>
+                <h3 style="margin: 0; color: #4f46e5;">LastKingz Liquor Store</h3>
+                <div style="color: #64748b; font-size: 14px; margin-top: 10px;">${new Date().toLocaleDateString()}</div>
+            </div>
+
+            <div style="background: #f8fafc; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                <h4 style="margin: 0 0 15px 0; color: #1e293b;">SUMMARY:</h4>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div><strong>Total Sales:</strong> ${report.total_sales}</div>
+                    <div><strong>Total Revenue:</strong> $${report.total_revenue.toFixed(2)}</div>
+                    <div style="color: #16a34a;"><strong>💵 Cash:</strong> $${report.cash_total.toFixed(2)}</div>
+                    <div style="color: #2563eb;"><strong>📱 EcoCash:</strong> $${report.ecocash_total.toFixed(2)}</div>
+                    <div><strong>Average Sale:</strong> $${report.avg_sale.toFixed(2)}</div>
+                    <div><strong>My Sales:</strong> ${report.my_sales} ($${report.my_revenue.toFixed(2)})</div>
+                    <div style="color: #16a34a;"><strong>My Cash:</strong> $${report.my_cash_total.toFixed(2)}</div>
+                    <div style="color: #2563eb;"><strong>My EcoCash:</strong> $${report.my_ecocash_total.toFixed(2)}</div>
+                </div>
+            </div>
+        `;
+
+        // All sales today
+        if (report.all_sales && report.all_sales.length > 0) {
+            content += `
+                <div style="margin-bottom: 20px;">
+                    <h4 style="margin: 0 0 15px 0; color: #1e293b;">ALL SALES TODAY:</h4>
+                    <table class="cart-table">
+                        <thead>
+                            <tr>
+                                <th style="text-align: left;">Sale ID</th>
+                                <th style="text-align: left;">Cashier</th>
+                                <th style="text-align: right;">Items</th>
+                                <th style="text-align: right;">Amount</th>
+                                <th style="text-align: center;">Payment</th>
+                                <th style="text-align: left;">Time</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+
+            report.all_sales.forEach(sale => {
+                const paymentIcon = sale.payment_method === 'ecocash' ? '📱' : '💵';
+                const paymentLabel = sale.payment_method === 'ecocash' ? 'EcoCash' : 'Cash';
+                const paymentColor = sale.payment_method === 'ecocash' ? '#2563eb' : '#16a34a';
+                content += `
+                    <tr>
+                        <td>#${sale.id}</td>
+                        <td>${sale.cashier}</td>
+                        <td style="text-align: right;">${sale.items}</td>
+                        <td style="text-align: right; color: #10b981; font-weight: 600;">$${sale.total.toFixed(2)}</td>
+                        <td style="text-align: center; color: ${paymentColor};">${paymentIcon} ${paymentLabel}</td>
+                        <td>${sale.time}</td>
+                    </tr>
+                `;
+            });
+
+            content += `
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        }
+
+        content += `<div style="text-align: center; color: #64748b; font-size: 13px; margin-top: 20px;">Report generated: ${new Date().toLocaleString()}</div>`;
+
+        document.getElementById('dailySalesReportContent').innerHTML = content;
+        document.getElementById('dailySalesReportModal').style.display = 'flex';
+    } else {
+        alert('Error loading daily sales report: ' + data.message);
+    }
+}
+
+function closeDailySalesReportModal() {
+    document.getElementById('dailySalesReportModal').style.display = 'none';
+}
+
+function printDailySalesReport() {
+    const content = document.getElementById('dailySalesReportContent').innerHTML;
+
+    // Create a new window for printing
+    const printWindow = window.open('', '', 'width=900,height=700');
+    printWindow.document.write('<html><head><title>Daily Sales Report - LastKingz Liquor Store</title>');
+    printWindow.document.write('<style>');
+    printWindow.document.write('body { font-family: Arial, sans-serif; font-size: 12px; margin: 20px; }');
+    printWindow.document.write('table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }');
+    printWindow.document.write('th, td { padding: 8px; border: 1px solid #e2e8f0; }');
+    printWindow.document.write('th { background: #f1f5f9; font-weight: 600; }');
+    printWindow.document.write('h2, h3, h4 { margin: 10px 0; }');
+    printWindow.document.write('@media print { button { display: none; } }');
+    printWindow.document.write('</style></head><body>');
+    printWindow.document.write(content);
+    printWindow.document.write('</body></html>');
+    printWindow.document.close();
+
+    // Wait for content to load then print
+    printWindow.focus();
+    setTimeout(() => {
+        printWindow.print();
+    }, 250);
+}
+
+// Close modal when clicking outside
+window.onclick = function(event) {
+    if (event.target == document.getElementById('dailySalesReportModal')) {
+        closeDailySalesReportModal();
+    }
+}
+</script>
+{% endblock %}
