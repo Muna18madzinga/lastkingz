@@ -27,10 +27,10 @@ wheels/
 instance/
 .webassets-cache
 
-# Database
-*.db
-*.sqlite
-*.sqlite3
+# Database (commented out to allow committing the database)
+# *.db
+# *.sqlite
+# *.sqlite3
 
 # IDE
 .vscode/
