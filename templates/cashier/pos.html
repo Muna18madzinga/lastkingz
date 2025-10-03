@@ -520,5 +520,32 @@ function keypadClear() {
         calculateChange();
     }
 }
+
+// Auto-focus barcode input on page load and keep it focused
+document.addEventListener('DOMContentLoaded', function() {
+    const barcodeInput = document.getElementById('barcodeInput');
+
+    // Focus on load
+    barcodeInput.focus();
+
+    // Re-focus when clicking anywhere on the page (except specific inputs)
+    document.addEventListener('click', function(e) {
+        // Don't interfere if clicking on payment input, buttons, or cart
+        if (e.target.id !== 'cashReceived' &&
+            e.target.tagName !== 'BUTTON' &&
+            e.target.tagName !== 'INPUT' &&
+            e.target.tagName !== 'TR' &&
+            e.target.tagName !== 'TD') {
+            barcodeInput.focus();
+        }
+    });
+
+    // Re-focus after any action that clears the input
+    const originalAddToCart = addToCart;
+    window.addToCart = async function() {
+        await originalAddToCart();
+        setTimeout(() => barcodeInput.focus(), 100);
+    };
+});
 </script>
 {% endblock %}
